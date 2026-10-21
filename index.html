@@ -347,6 +347,7 @@ const IC = {
   key:'<circle cx="8" cy="15" r="4"/><path d="m11 12 9-9M17 6l3 3"/>',
   users2:'<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 9h6M7 13h10M7 17h4"/><circle cx="17" cy="9" r="1.5"/>',
   up:'<path d="M12 19V5M6 11l6-6 6 6"/>',
+  cal:'<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4M7 14h3M14 14h3M7 17h3"/>',
   gauge:'<path d="M4 18a8 8 0 1 1 16 0"/><path d="M12 18l4-6"/><path d="M3 18h18"/>'
 };
 const icon = (n, s='') => `<svg class="i" viewBox="0 0 24 24" ${s} aria-hidden="true">${IC[n]}</svg>`;
@@ -418,13 +419,13 @@ const TABS = [
   {id:'revision', t:'Aprobación', i:'shield', ok:()=>is('subprog','subplan'), g:'Circuito'},
   {id:'cheques', t:'Cheques diferidos', i:'cheque', ok:()=>internal(), g:'Circuito'},
   {id:'techos', t:'Techos', i:'gauge', ok:()=>internal(), g:'Circuito'},
+  {id:'esquemas', t:'Esquemas de pago', i:'cal', ok:()=>is('director','subprog','subplan'), g:'Circuito'},
   {id:'base', t:'Base de facturas', i:'db', ok:()=>internal(), g:'Información'},
   {id:'proveedores', t:'Proveedores', i:'users2', ok:()=>internal(), g:'Información'},
   {id:'analisis', t:'Análisis y flujo', i:'chart', ok:()=>is('subprog','subplan'), g:'Información'},
-  {id:'alertas', t:'Alertas', i:'bell', ok:()=>is('director','subprog','subplan'), g:'Información'},
   {id:'usuarios', t:'Usuarios', i:'users', ok:()=>is('subplan'), g:'Administración'}
 ];
-const TITLES = {inicio:'Pagos aprobados', presel:'Preselección de facturas', revision:'Aprobación', cheques:'Cheques diferidos', base:'Base de facturas', analisis:'Análisis y flujo de caja', alertas:'Alertas', usuarios:'Usuarios', proveedores:'Proveedores', techos:'Techos semanales'};
+const TITLES = {inicio:'Pagos aprobados', presel:'Preselección de facturas', revision:'Aprobación', cheques:'Cheques diferidos', base:'Base de facturas', analisis:'Análisis y flujo de caja', esquemas:'Esquemas de pago', usuarios:'Usuarios', proveedores:'Proveedores', techos:'Techos semanales'};
 
 /* ============ Clasificación de facturas (criterios de prioridad) ============ */
 const CLS_DEF={dias_limite:120, fecha_limite:'2025-09-01', saldo_limite:100000000, jur_esenciales:[1110104000,1110105000,1110107000,1110117000,1110118000], jur_nombres:{}, sae_cprov:[], sae_ff:[]};
@@ -516,7 +517,7 @@ function myAccount(){
   m.innerHTML=`<form class="dlg" id="maf"><h2>Mi cuenta</h2>
     <div class="row"><div class="av">${esc(initials(p.nombre||p.email))}</div><div><b>${esc(p.nombre||p.email)}</b><div class="cap">${esc(p.cargo||ROLES[realRole()])} · ${esc(p.email||'')}</div></div></div>
     <div class="card flat" style="padding:12px 14px"><label class="chk"><input type="checkbox" id="mavis" ${p.recibe_mails!==false?'checked':''}> Recibir los avisos por correo en ${esc(p.email||'')}</label>
-      <div class="cap">${realRole()==='director'?'Programaciones rechazadas, cambios que haga la Subsecretaría al aprobar, pagos aprobados y el resumen de alertas de los lunes a las 8.':realRole()==='subprog'?'Programaciones enviadas a aprobación y pagos aprobados.':'Pagos aprobados.'}</div></div>
+      <div class="cap">${realRole()==='director'?'Programaciones rechazadas, cambios que haga la Subsecretaría al aprobar, pagos aprobados y el resumen de alertas de los lunes a las 8.':realRole()==='subprog'?'Programaciones enviadas a aprobación, esquemas de pago que cargue Planificación y pagos aprobados.':'Pagos aprobados.'}</div></div>
     <label class="f">Contraseña nueva<input type="password" id="np1" minlength="8" required autocomplete="new-password"></label>
     <label class="f">Repetila<input type="password" id="np2" minlength="8" required autocomplete="new-password"></label>
     <div class="row"><button class="btn pri" type="submit">Cambiar contraseña</button><span class="sp"></span><button class="btn" type="button" id="mac">Cerrar</button></div></form>`;
@@ -550,7 +551,7 @@ function shell(){
       <header class="topbar">
         <div class="lg mobile-only" style="width:34px;height:34px;border-radius:10px;background:var(--brand);color:#fff;place-items:center;font-weight:800">M</div>
         <div><div class="sub">${esc(fdl(today()))}</div><h1>${TITLES[S.tab]}</h1></div><span class="sp"></span>
-        ${is('director','subprog','subplan')?`<button class="icbtn" id="bBell" title="Alertas">${icon('bell')}${av.length?'<span class="dot"></span>':''}</button>`:''}
+        ${is('director','subprog','subplan')?`<button class="icbtn" id="bBell" title="Avisos">${icon('bell')}${av.length?'<span class="dot"></span>':''}</button>`:''}
         <button class="icbtn" id="bRef" title="Actualizar datos">${icon('refresh')}</button>
         <button class="icbtn mobile-only" id="bAcc2" title="Mi cuenta">${icon('key')}</button>
         <button class="icbtn mobile-only" id="bOut2" title="Salir">${icon('out')}</button>
@@ -563,17 +564,17 @@ function shell(){
   const out=async()=>{ await sb.auth.signOut(); };
   $('#bOut').onclick=out; $('#bOut2').onclick=out; $('#bAcc').onclick=myAccount; $('#bAcc2').onclick=myAccount;
   $('#bRef').onclick=()=>refresh().then(()=>toast('Datos actualizados'));
-  const bb=$('#bBell'); if(bb) bb.onclick=()=>{ location.hash='alertas'; };
+  const bb=$('#bBell'); if(bb) bb.onclick=()=>{ location.hash='esquemas'; };
 }
 function avisosHtml(){
   const l=activeAlerts(); if(!l.length) return '';
-  return `<div class="avisos">${l.slice(0,4).map(a=>`<div class="aviso ${a.cls}"><div class="ic">${icon('warn')}</div><div><b class="k">${esc(a.st)}</b>${a.html}</div></div>`).join('')}${l.length>4?`<a href="#alertas" style="font-size:13px;font-weight:600">Ver ${l.length-4} alertas más</a>`:''}</div>`;
+  return `<div class="avisos">${l.slice(0,4).map(a=>`<div class="aviso ${a.cls}"><div class="ic">${icon('warn')}</div><div><b class="k">${esc(a.st)}</b>${a.html}</div></div>`).join('')}${l.length>4?`<a href="#esquemas" style="font-size:13px;font-weight:600">Ver ${l.length-4} alertas más</a>`:''}</div>`;
 }
 function render(){
   if(!S.session){ viewLogin(); return; }
   if(!TABS.find(t=>t.id===S.tab&&t.ok())) S.tab='inicio';
   destroyCharts(); shell();
-  ({inicio:viewInicio, presel:viewPresel, revision:viewRevision, cheques:viewCheques, base:viewBase, analisis:viewAnalisis, alertas:viewAlertas, techos:viewTechos, usuarios:viewUsuarios, proveedores:viewProveedores})[S.tab]();
+  ({inicio:viewInicio, presel:viewPresel, revision:viewRevision, cheques:viewCheques, base:viewBase, analisis:viewAnalisis, esquemas:viewEsquemas, techos:viewTechos, usuarios:viewUsuarios, proveedores:viewProveedores})[S.tab]();
 }
 let PV_NEXT=null;
 function goProveedor(cp){ if(S.tab==='proveedores'){ PV=cp; render(); window.scrollTo(0,0); } else { PV_NEXT=cp; location.hash='proveedores'; } }
@@ -1303,7 +1304,9 @@ function paidIn(cprov, y, m, w, estados){
 function evalAlert(a, y, m){
   const t=today();
   if(a.tipo==='proveedor'){
-    const [A,B]=womRange(y,m,a.semana); const pag=paidIn(a.cprov,y,m,a.semana,['aprobada']); const cur=paidIn(a.cprov,y,m,a.semana,['borrador','enviada']);
+    const [A,B]=womRange(y,m,a.semana);
+    if(a.pagado_at) return {st:'Pagado',cls:'ok',pag:a.monto,cur:0,A,B,manual:true};
+    if(!a.cprov){ const st=iso(B)<t?'Vencido sin marcar':iso(A)<=t?'Esta semana':(A-new Date())/864e5<=7?'Próxima semana':'Programado'; return {st,cls:st==='Vencido sin marcar'?'bad':st==='Programado'?'info':'warn',pag:0,cur:0,A,B,fuera:true}; } const pag=paidIn(a.cprov,y,m,a.semana,['aprobada']); const cur=paidIn(a.cprov,y,m,a.semana,['borrador','enviada']);
     let st, cls;
     if(pag>=a.monto-0.5){ st='Cumplida'; cls='ok'; }
     else if(iso(B)<t){ st='Incumplida'; cls='bad'; }
@@ -1331,10 +1334,10 @@ function activeAlerts(){
   if(!is('director','subprog','subplan')) return [];
   const d=new Date(), y=d.getFullYear(), m=d.getMonth(), out=[];
   const cv=cargaVencida(); if(cv) out.push({cls:'warn',st:'Listado General',html:`${cv.txt} <a href="#base">Cargar</a>`});
-  for(const c of controlPorPago()) if(c.falta>0.5) out.push({cls:'bad',st:'Programado y no pagado',html:`El pago del ${fd(c.fecha_pago)} tenía ${money(c.monto)} aprobados y, según el Listado General del ${fd(c.listado)}, no se pagaron <b class="amt">${money(c.falta)}</b> (${c.nf} facturas de ${c.np} proveedores). <a href="#alertas">Ver detalle</a>`});
+  for(const c of controlPorPago()) if(c.falta>0.5) out.push({cls:'bad',st:'Programado y no pagado',html:`El pago del ${fd(c.fecha_pago)} tenía ${money(c.monto)} aprobados y, según el Listado General del ${fd(c.listado)}, no se pagaron <b class="amt">${money(c.falta)}</b> (${c.nf} facturas de ${c.np} proveedores). <a href="#esquemas">Ver detalle</a>`});
   for(let w=wom(today());w<=4;w++){ const tc=techoDe(y,m,w); if(!tc) continue; const t=paidIn(null,y,m,w,['aprobada','borrador','enviada']); if(t>tc.monto+0.5) out.push({cls:'bad',st:'Techo superado',html:`La semana ${w} de ${MES[m]} tiene programados ${money(t)} y el techo es ${money(tc.monto)}. <a href="#techos">Ver techos</a>`}); }
   for(const a of S.alertas){ if(!alertApplies(a,y,m)) continue; const e=evalAlert(a,y,m);
-    if(a.tipo==='proveedor' && ['Pendiente esta semana','Próxima semana','Incumplida'].includes(e.st)) out.push({cls:e.cls==='bad'?'bad':'warn',st:e.st,html:`${alertText(a)}. Pagado ${money(e.pag)}${e.cur?`, en curso ${money(e.cur)}`:''}.${a.nota?' '+esc(a.nota):''}`});
+    if(a.tipo==='proveedor' && ['Pendiente esta semana','Próxima semana','Incumplida','Esta semana','Vencido sin marcar'].includes(e.st)) out.push({cls:e.cls==='bad'?'bad':'warn',st:'Esquema de pago · '+e.st,html:`${alertText(a)}. ${e.fuera?'Se paga por fuera del Listado General: marcalo como pagado en <a href="#esquemas">Esquemas de pago</a>.':`Pagado ${money(e.pag)}${e.cur?`, en curso ${money(e.cur)}`:''}.`}${a.nota?' '+esc(a.nota):''}`});
     if(a.tipo==='tope_semanal' && e.ex.length) out.push({cls:'bad',st:'Tope superado',html:`${alertText(a)}. Semana ${e.ex.map(x=>x.w+': '+mm(x.t)).join(', ')}.`});
     if(a.tipo==='antiguedad' && e.n) out.push({cls:'warn',st:'Facturas viejas',html:`${alertText(a)}: ${e.n} por ${mm(e.amt)}.`}); }
   return out;
@@ -1353,7 +1356,7 @@ function alertsForDate(fecha, items){
   if(tc){ const tot=paidIn(null,y,m,w,['aprobada','borrador','enviada']) - sum([...W.saved.values()]) + sum(items,i=>i.monto);
     out.push({cls:tot>tc.monto+0.5?'bad':'ok',html:`Techo de la semana ${w}: <b class="amt">${money(tc.monto)}</b>. Con esta programación la semana suma <b class="amt">${money(tot)}</b>${tot>tc.monto+0.5?`: lo supera por ${money(tot-tc.monto)}.`:`: quedan ${money(tc.monto-tot)}.`}`}); }
   for(const a of S.alertas){ if(!alertApplies(a,y,m)) continue;
-    if(a.tipo==='proveedor' && a.semana===w){
+    if(a.tipo==='proveedor' && a.cprov && a.semana===w){
       const here=sum(items.filter(i=>i.cprov===a.cprov),i=>i.monto);
       const other=paidIn(a.cprov,y,m,w,['aprobada']) - (W&&W.estado==='aprobada'?here:0);
       const tot=here+other, ok=tot>=a.monto-0.5;
@@ -1415,53 +1418,91 @@ function viewTechos(){
     }catch(e){ fail(e); } });
   main().querySelectorAll('[data-tm]').forEach(b=>b.onclick=()=>{ TF={mes:b.dataset.tm}; viewTechos(); window.scrollTo(0,0); });
 }
-function viewAlertas(){
-  const canEdit=is('subprog'), d=new Date(), y=d.getFullYear(), m=d.getMonth();
+const ESQ_FIJOS=['PROVINCIA ART','AAARBA','URBASER'];
+let EF=null, EM=null, AVF=false;
+function esqGrupos(mk){
+  const g=new Map();
+  for(const a of S.alertas){ if(a.tipo!=='proveedor') continue; if(a.mes && monthKey(a.mes)!==mk) continue;
+    const k=(a.cprov||'')+'|'+a.proveedor+'|'+(a.mes?'m':'r'); if(!g.has(k)) g.set(k,{proveedor:a.proveedor,cprov:a.cprov,rec:!a.mes,rows:[]}); g.get(k).rows.push(a); }
+  return [...g.values()].sort((a,b)=>a.proveedor.localeCompare(b.proveedor,'es'));
+}
+function esqForm(mk){
+  const f=EF;
+  return `<form class="card flat" id="ef" style="margin-top:12px;background:var(--card2)"><h3>Nuevo esquema de pago</h3>
+    <p class="cap">Monto a pagar en cada semana del mes. Dejá vacías las semanas sin pago.</p>
+    <div class="row" style="margin-top:10px">${ESQ_FIJOS.map(n=>`<button type="button" class="btn sm" data-ep="${n}">${n}</button>`).join('')}<span class="cap">o elegí cualquier proveedor del listado</span></div>
+    ${provOptions().replace('<datalist id="provs">','<datalist id="provs">'+ESQ_FIJOS.map(n=>`<option value="${n}">`).join(''))}
+    <div class="filters" style="margin-top:12px">
+      <label class="f" style="flex:2 1 280px">Proveedor<input type="text" id="epv" list="provs" required value="${esc(f.proveedor||'')}" placeholder="Nombre o elegí de la lista"></label>
+      <label class="f">Mes<input type="month" id="emm" value="${f.mes||mk}"></label>
+      <label class="chk" style="align-self:center"><input type="checkbox" id="erec" ${f.rec?'checked':''}> Todos los meses</label></div>
+    <div class="filters" style="margin-top:10px">${[1,2,3,4].map(w=>`<label class="f">Semana ${w} (millones)<input type="text" class="money" data-ew="${w}" placeholder="—" style="width:130px"></label>`).join('')}
+      <label class="f" style="flex:2 1 220px">Nota<input type="text" id="ent" placeholder="Ej.: cuota de octubre"></label></div>
+    <div class="row" style="margin-top:14px"><button class="btn pri" type="submit">Guardar esquema</button><button class="btn" type="button" id="efx">Cancelar</button></div></form>`;
+}
+function viewEsquemas(){
+  const canEdit=is('subprog','subplan'), canAv=is('subprog'), mk=EM||monthKey(today()), [yy,mo]=mk.split('-').map(Number), y=yy, m=mo-1;
+  const gs=esqGrupos(mk), tot=sum(gs.flatMap(g=>g.rows),a=>a.monto);
+  const prevK=monthKey(iso(new Date(y,m-1,1))), prev=S.alertas.filter(a=>a.tipo==='proveedor'&&a.mes&&monthKey(a.mes)===prevK);
+  const viejas=S.alertas.filter(a=>a.tipo!=='proveedor');
   main().innerHTML=`
-    <p class="lead" style="margin:0">Lo que se controla contra las programaciones: si lo programado se pagó de verdad y las alertas de pagos comprometidos y facturas viejas. Los techos semanales están en su propia pestaña. El Director de Pagos recibe este resumen por correo los lunes a las 8.</p>
+    <p class="lead" style="margin:0">Cuánto hay que pagarle a cada proveedor y en qué semana del mes. Los cargan las Subsecretarías de Planificación Presupuestaria y de Administración Financiera; cuando carga Planificación, se avisa por correo a Administración Financiera. Se controlan contra las programaciones aprobadas y llegan al Director en el correo de los lunes.</p>
+    <section class="card"><div class="sect"><div><h3>Esquemas de pago por proveedor</h3><p class="cap">Semanas del mes: 1 del 1 al 7 · 2 del 8 al 14 · 3 del 15 al 21 · 4 del 22 a fin de mes.${mk===monthKey(today())?` Hoy es la semana ${wom(today())}.`:''}</p></div>
+      <div class="row"><label class="f">Mes<input type="month" id="emes" value="${mk}"></label>
+      ${canEdit?`${prev.length?`<button class="btn" id="eCopy" title="Copia los esquemas de ${monthName(prevK)} que no estén cargados en este mes">Copiar de ${MESC[(m+11)%12]}</button>`:''}<button class="btn pri" id="eNew">+ Nuevo esquema</button>`:''}</div></div>
+    ${EF?esqForm(mk):''}
+    ${gs.length?`<div class="tw" style="margin-top:12px"><table><thead><tr><th>Proveedor</th>${[1,2,3,4].map(w=>`<th class="n">Semana ${w}</th>`).join('')}<th class="n">Total</th>${canEdit?'<th></th>':''}</tr></thead><tbody>
+      ${gs.map(g=>{ const byW=new Map(g.rows.map(a=>[a.semana,a]));
+        return `<tr><td class="prov"><b>${g.cprov?`<button class="link" data-cp="${g.cprov}">${esc(g.proveedor)}</button>`:esc(g.proveedor)}</b><span class="sub">${g.cprov?'C.PROV '+g.cprov:'Fuera del Listado General'}${g.rec?' · todos los meses':''}${g.rows.find(a=>a.nota)?' · '+esc(g.rows.find(a=>a.nota).nota):''}</span></td>
+          ${[1,2,3,4].map(w=>{ const a=byW.get(w); if(!a) return '<td class="n"><span class="cap">—</span></td>'; const e=evalAlert(a,y,m);
+            return `<td class="n"><b class="amt">${money(a.monto)}</b><span class="sub"><span class="pill ${e.cls}">${e.st}</span></span>
+              ${!e.fuera&&!e.manual?`<span class="sub">aprobado ${mm(e.pag)}${e.cur?' · en curso '+mm(e.cur):''}</span>`:''}
+              ${canEdit&&(e.fuera||e.manual)?`<span class="sub"><button class="link" data-epag="${a.id}">${a.pagado_at?'Desmarcar':'Marcar pagado'}</button></span>`:''}</td>`; }).join('')}
+          <td class="n"><b>${money(sum(g.rows,a=>a.monto))}</b></td>
+          ${canEdit?`<td><button class="btn sm ghost" data-edel="${g.rows.map(a=>a.id).join(',')}">Eliminar</button></td>`:''}</tr>`; }).join('')}
+      </tbody><tfoot><tr><td>Total del mes</td>${[1,2,3,4].map(w=>`<td class="n">${money(sum(gs.flatMap(g=>g.rows).filter(a=>a.semana===w),a=>a.monto))}</td>`).join('')}<td class="n">${money(tot)}</td>${canEdit?'<td></td>':''}</tr></tfoot></table></div>`
+      :`<div class="empty" style="margin-top:12px"><b>No hay esquemas para ${monthName(mk)}</b>${canEdit?(prev.length?`Podés copiar los de ${monthName(prevK)} o cargar uno nuevo.`:'Cargá el primero con “+ Nuevo esquema”.'):'Los cargan las Subsecretarías.'}</div>`}
+    </section>
     ${controlCard()}
-    <div class="sect" style="margin-top:6px"><div><h2>Alertas</h2><p class="cap">Las crea la Subsecretaría de Administración Financiera. Semanas del mes: 1 del 1 al 7 · 2 del 8 al 14 · 3 del 15 al 21 · 4 del 22 a fin de mes. Hoy es la semana ${wom(today())} de ${MES[m]}.</p></div>
-      ${canEdit?'<button class="btn pri" id="alNew">+ Nueva alerta</button>':''}</div>
-    ${ALF?alertForm():''}
-    ${S.alertas.length?`<section class="card" style="padding:14px 10px"><div class="mov">${S.alertas.map(a=>{ const e=evalAlert(a,y,m); const appl=alertApplies(a,y,m);
-        const det = a.tipo==='proveedor'?`Pagado ${money(e.pag)}${e.cur?` · en curso ${money(e.cur)}`:''} · del ${fd(iso(e.A))} al ${fd(iso(e.B))}`: a.tipo==='tope_semanal'? e.res.map(r=>`S${r.w}: ${mm(r.t)}`).join(' · ') : `${e.n} facturas · ${mm(e.amt)}`;
-        return `<div class="mi" style="cursor:default;${a.activa?'':'opacity:.55'}"><span class="ic">${icon('bell')}</span><span style="min-width:0"><span class="t" style="display:block;white-space:normal">${alertText(a)}</span>
-          <span class="d" style="display:block">${a.mes?monthName(a.mes.slice(0,7)):'Todos los meses'} · ${det}${a.nota?' · '+esc(a.nota):''}</span></span>
-          <span class="r" style="display:flex;flex-direction:column;align-items:flex-end;gap:6px">${appl?`<span class="pill ${e.cls}">${e.st}</span>`:`<span class="pill mute">${a.activa?'No aplica este mes':'Desactivada'}</span>`}
-          ${canEdit?`<span class="row" style="gap:4px"><button class="btn sm" data-tg="${a.id}">${a.activa?'Desactivar':'Activar'}</button><button class="btn sm ghost" data-ad="${a.id}">Eliminar</button></span>`:''}</span></div>`; }).join('')}</div></section>`
-      :`<div class="empty"><b>No hay alertas cargadas</b>${canEdit?'Creá una para recordar un pago comprometido con un proveedor, o vigilar facturas viejas.':'La Subsecretaría de Administración Financiera define las alertas.'}</div>`}`;
+    <section class="card"><div class="sect"><div><h3>Facturas viejas sin programar</h3><p class="cap">Avisos por antigüedad de la deuda. Los define la Subsecretaría de Administración Financiera.</p></div>${canAv?'<button class="btn sm" id="avNew">+ Nuevo aviso</button>':''}</div>
+      ${AVF?`<form class="row" id="avf" style="margin-top:10px"><label class="f">Avisar facturas con más de (días)<input type="number" id="avd" value="90" min="1" style="width:110px"></label><button class="btn pri" type="submit">Guardar</button><button class="btn" type="button" id="avx">Cancelar</button></form>`:''}
+      ${viejas.length?`<div class="mov" style="margin-top:6px">${viejas.map(a=>{ const e=evalAlert(a,y,m), det=a.tipo==='tope_semanal'?e.res.map(r=>`S${r.w}: ${mm(r.t)}`).join(' · '):`${e.n} facturas · ${mm(e.amt)}`;
+        return `<div class="mi" style="cursor:default;${a.activa?'':'opacity:.55'}"><span class="ic">${icon('warn')}</span><span style="min-width:0"><span class="t" style="display:block;white-space:normal">${alertText(a)}</span><span class="d" style="display:block">${det}</span></span>
+          <span class="r" style="display:flex;flex-direction:column;align-items:flex-end;gap:6px"><span class="pill ${a.activa?e.cls:'mute'}">${a.activa?e.st:'Desactivado'}</span>${canAv?`<span class="row" style="gap:4px"><button class="btn sm" data-tg="${a.id}">${a.activa?'Desactivar':'Activar'}</button><button class="btn sm ghost" data-ad="${a.id}">Eliminar</button></span>`:''}</span></div>`; }).join('')}</div>`
+      :'<p class="cap" style="margin-top:8px">No hay avisos de antigüedad cargados.</p>'}</section>`;
   const on=(id,fn)=>{ const b=$(id); if(b) b.onclick=fn; };
-  on('#alNew',()=>{ ALF={tipo:'proveedor'}; viewAlertas(); });
+  const em=$('#emes'); if(em) em.onchange=()=>{ if(em.value){ EM=em.value; viewEsquemas(); } };
+  on('#eNew',()=>{ EF={}; viewEsquemas(); });
+  on('#efx',()=>{ EF=null; viewEsquemas(); });
+  main().querySelectorAll('[data-ep]').forEach(b=>b.onclick=()=>{ $('#epv').value=b.dataset.ep; });
+  const ef=$('#ef'); if(ef) ef.onsubmit=async ev=>{ ev.preventDefault();
+    try{
+      const pv=parseProv($('#epv').value); if(!pv.proveedor) throw new Error('Falta el proveedor.');
+      if(!pv.cprov){ const hit=[...new Map(S.fact.map(r=>[r.cprov,r.proveedor])).entries()].find(([c,n])=>n.toUpperCase()===pv.proveedor.toUpperCase()); if(hit){ pv.cprov=hit[0]; pv.proveedor=hit[1]; } else pv.proveedor=pv.proveedor.toUpperCase(); }
+      const rec=$('#erec').checked, mes=rec?null:($('#emm').value||mk)+'-01', nota=$('#ent').value.trim(), rows=[];
+      for(const inp of main().querySelectorAll('[data-ew]')){ const raw=inp.value.trim(); if(!raw) continue; const v=parseAmt(raw); if(!(v>0)) throw new Error(`El monto de la semana ${inp.dataset.ew} no es válido.`);
+        rows.push({tipo:'proveedor', proveedor:pv.proveedor, cprov:pv.cprov||null, semana:+inp.dataset.ew, monto:Math.round(v*1e6*100)/100, mes, nota}); }
+      if(!rows.length) throw new Error('Cargá el monto de al menos una semana.');
+      await q(sb.from('alertas').insert(rows)); toast(is('subplan')?'Esquema guardado. Se avisó a Administración Financiera.':'Esquema guardado'); EF=null; if(mes) EM=mes.slice(0,7); await refresh();
+    }catch(e){ fail(e); } };
+  on('#eCopy',async()=>{ const b=$('#eCopy'); if(b.dataset.armed!=='1'){ b.dataset.armed='1'; b.textContent=prev.length===1?'¿Copiar 1 pago?':'¿Copiar '+prev.length+' pagos?'; return; }
+    try{ const have=new Set(S.alertas.filter(a=>a.tipo==='proveedor'&&a.mes&&monthKey(a.mes)===mk).map(a=>a.proveedor+'|'+a.semana));
+      const rows=prev.filter(a=>!have.has(a.proveedor+'|'+a.semana)).map(a=>({tipo:'proveedor',proveedor:a.proveedor,cprov:a.cprov,semana:a.semana,monto:a.monto,mes:mk+'-01',nota:a.nota||''}));
+      if(!rows.length){ toast('Ya estaban todos cargados'); return; }
+      await q(sb.from('alertas').insert(rows)); toast(`Se copiaron ${rows.length} pagos`); await refresh();
+    }catch(e){ fail(e); } });
+  main().querySelectorAll('[data-epag]').forEach(b=>b.onclick=async()=>{ const a=S.alertas.find(x=>x.id===+b.dataset.epag);
+    try{ await q(sb.from('alertas').update(a.pagado_at?{pagado_at:null,pagado_por:null}:{pagado_at:new Date().toISOString(),pagado_por:S.session.user.id}).eq('id',a.id)); await refresh(); }catch(e){ fail(e); } });
+  main().querySelectorAll('[data-edel]').forEach(b=>b.onclick=async()=>{ if(b.dataset.armed!=='1'){ b.dataset.armed='1'; b.textContent='¿Confirmar?'; b.classList.add('bad'); return; }
+    try{ await q(sb.from('alertas').delete().in('id',b.dataset.edel.split(',').map(Number))); toast('Esquema eliminado'); await refresh(); }catch(e){ fail(e); } });
+  on('#avNew',()=>{ AVF=true; viewEsquemas(); });
+  on('#avx',()=>{ AVF=false; viewEsquemas(); });
+  const avf=$('#avf'); if(avf) avf.onsubmit=async ev=>{ ev.preventDefault(); try{ await q(sb.from('alertas').insert({tipo:'antiguedad',dias:+$('#avd').value||90})); AVF=false; toast('Aviso creado'); await refresh(); }catch(e){ fail(e); } };
   on('#ctXls',()=>xlsxSave('control-de-lo-programado.xlsx',[{name:'Control',head:['Fecha de pago','Programación','Proveedor','C.PROV','Comprobante','Programado','Saldo antes','Saldo después','Pagado','Resultado','Cómo se comparó','Listado del'],
     rows:S.control.map(c=>[fd(c.fecha_pago),c.titulo||'',c.proveedor,c.cprov,c.comprobante||c.clave,c.monto,c.saldo_antes,c.saldo_despues,c.pagado,c.resultado,c.comparacion,fd(c.listado)]),money:[5,6,7,8],ints:[3],widths:[12,22,38,9,20,16,16,16,16,12,26,12]}]).catch(fail));
   main().querySelectorAll('[data-cp]').forEach(b=>b.onclick=e=>{ e.preventDefault(); goProveedor(+b.dataset.cp); });
   main().querySelectorAll('[data-tg]').forEach(b=>b.onclick=async()=>{ const a=S.alertas.find(x=>x.id===+b.dataset.tg); try{ await q(sb.from('alertas').update({activa:!a.activa}).eq('id',a.id)); await refresh(); }catch(e){fail(e);} });
-  main().querySelectorAll('[data-ad]').forEach(b=>b.onclick=async()=>{ if(b.dataset.armed!=='1'){ b.dataset.armed='1'; b.textContent='¿Confirmar?'; b.classList.add('bad'); return; } try{ await q(sb.from('alertas').delete().eq('id',+b.dataset.ad)); toast('Alerta eliminada'); await refresh(); }catch(e){fail(e);} });
-  if(ALF) bindAlertForm();
-}
-function alertForm(){
-  const t=ALF.tipo, mk=monthKey(today());
-  return `<form class="card" id="alf"><h3>Nueva alerta</h3>${provOptions()}
-    <div class="filters" style="margin-top:12px">
-      <label class="f">Tipo<select id="alt"><option value="proveedor" ${t==='proveedor'?'selected':''}>Pago a proveedor en una semana</option><option value="antiguedad" ${t==='antiguedad'?'selected':''}>Facturas viejas sin programar</option></select></label>
-      ${t==='proveedor'?`<label class="f" style="flex:2 1 260px">Proveedor<input type="text" id="alp" list="provs" required placeholder="Elegí de la lista"></label>`:''}
-      ${t!=='antiguedad'?`<label class="f">Monto (millones de $)<input type="text" id="alm" class="money" required placeholder="Ej.: 30"></label>`:''}
-      ${t==='proveedor'?`<label class="f">Semana del mes<select id="als">${[1,2,3,4].map(w=>`<option value="${w}">Semana ${w}</option>`).join('')}</select></label>`:''}
-      ${t!=='antiguedad'?`<label class="f">Mes<input type="month" id="almes" value="${mk}"></label><label class="chk"><input type="checkbox" id="alrec"> Todos los meses</label>`:`<label class="f">Más de (días)<input type="number" id="ald" value="90" min="1" style="width:100px"></label>`}
-      <label class="f" style="flex:2 1 220px">Nota<input type="text" id="aln" placeholder="Ej.: acuerdo de pago, cuota 2 de 4"></label></div>
-    <div class="row" style="margin-top:14px"><button class="btn pri" type="submit">Guardar alerta</button><button class="btn" type="button" id="alx">Cancelar</button></div></form>`;
-}
-function bindAlertForm(){
-  $('#alt').onchange=e=>{ ALF.tipo=e.target.value; viewAlertas(); };
-  $('#alx').onclick=()=>{ ALF=null; viewAlertas(); };
-  $('#alf').onsubmit=async ev=>{ ev.preventDefault();
-    try{
-      const t=ALF.tipo, rec=$('#alrec')?.checked; const o={tipo:t, nota:$('#aln').value.trim()};
-      if(t!=='antiguedad'){ const v=parseAmt($('#alm').value); if(!(v>0)) throw new Error('Ingresá el monto en millones.'); o.monto=Math.round(v*1e6*100)/100; o.mes=rec?null:($('#almes').value+'-01'); }
-      if(t==='proveedor'){ const p=parseProv($('#alp').value); if(!p.cprov) throw new Error('Elegí el proveedor de la lista para que la alerta pueda controlar sus pagos.'); Object.assign(o,p); o.semana=+$('#als').value; }
-      if(t==='antiguedad') o.dias=+$('#ald').value||90;
-      await q(sb.from('alertas').insert(o)); toast('Alerta creada'); ALF=null; await refresh();
-    }catch(e){ fail(e); } };
+  main().querySelectorAll('[data-ad]').forEach(b=>b.onclick=async()=>{ if(b.dataset.armed!=='1'){ b.dataset.armed='1'; b.textContent='¿Confirmar?'; b.classList.add('bad'); return; } try{ await q(sb.from('alertas').delete().eq('id',+b.dataset.ad)); toast('Aviso eliminado'); await refresh(); }catch(e){fail(e);} });
 }
 
 /* ============ Usuarios ============ */
