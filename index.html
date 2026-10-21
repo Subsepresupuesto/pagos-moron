@@ -346,7 +346,8 @@ const IC = {
   warn:'<path d="M12 3 2 20h20z"/><path d="M12 10v4M12 17h.01"/>',
   key:'<circle cx="8" cy="15" r="4"/><path d="m11 12 9-9M17 6l3 3"/>',
   users2:'<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 9h6M7 13h10M7 17h4"/><circle cx="17" cy="9" r="1.5"/>',
-  up:'<path d="M12 19V5M6 11l6-6 6 6"/>'
+  up:'<path d="M12 19V5M6 11l6-6 6 6"/>',
+  gauge:'<path d="M4 18a8 8 0 1 1 16 0"/><path d="M12 18l4-6"/><path d="M3 18h18"/>'
 };
 const icon = (n, s='') => `<svg class="i" viewBox="0 0 24 24" ${s} aria-hidden="true">${IC[n]}</svg>`;
 
@@ -416,13 +417,14 @@ const TABS = [
   {id:'presel', t:'Preselección', i:'list', ok:()=>is('director','subplan'), g:'Circuito'},
   {id:'revision', t:'Aprobación', i:'shield', ok:()=>is('subprog','subplan'), g:'Circuito'},
   {id:'cheques', t:'Cheques diferidos', i:'cheque', ok:()=>internal(), g:'Circuito'},
+  {id:'techos', t:'Techos', i:'gauge', ok:()=>internal(), g:'Circuito'},
   {id:'base', t:'Base de facturas', i:'db', ok:()=>internal(), g:'Información'},
   {id:'proveedores', t:'Proveedores', i:'users2', ok:()=>internal(), g:'Información'},
   {id:'analisis', t:'Análisis y flujo', i:'chart', ok:()=>is('subprog','subplan'), g:'Información'},
   {id:'alertas', t:'Alertas', i:'bell', ok:()=>is('director','subprog','subplan'), g:'Información'},
-  {id:'usuarios', t:'Usuarios', i:'users', ok:()=>is('subprog','subplan'), g:'Administración'}
+  {id:'usuarios', t:'Usuarios', i:'users', ok:()=>is('subplan'), g:'Administración'}
 ];
-const TITLES = {inicio:'Pagos aprobados', presel:'Preselección de facturas', revision:'Aprobación', cheques:'Cheques diferidos', base:'Base de facturas', analisis:'Análisis y flujo de caja', alertas:'Alertas', usuarios:'Usuarios', proveedores:'Proveedores'};
+const TITLES = {inicio:'Pagos aprobados', presel:'Preselección de facturas', revision:'Aprobación', cheques:'Cheques diferidos', base:'Base de facturas', analisis:'Análisis y flujo de caja', alertas:'Alertas', usuarios:'Usuarios', proveedores:'Proveedores', techos:'Techos semanales'};
 
 /* ============ Clasificación de facturas (criterios de prioridad) ============ */
 const CLS_DEF={dias_limite:120, fecha_limite:'2025-09-01', saldo_limite:100000000, jur_esenciales:[1110104000,1110105000,1110107000,1110117000,1110118000], jur_nombres:{}, sae_cprov:[], sae_ff:[]};
@@ -476,7 +478,7 @@ async function loadInternal(){
   try{ S.control=(await q(sb.rpc('control_programado',{p_dias:120}))).map(c=>({...c, monto:+c.monto, pagado:+c.pagado, saldo_antes:c.saldo_antes==null?null:+c.saldo_antes, saldo_despues:+c.saldo_despues})); }catch(e){ S.control=[]; console.warn(e); }
   try{ const pr=await q(sb.from('parametros').select('*').eq('clave','clasificacion')); if(pr[0]) CLS={...CLS_DEF,...pr[0].valor}; }catch(e){ console.warn(e); }
   S.deudaProv=new Map(); for(const r of S.fact) if(r.pendiente>0) S.deudaProv.set(r.cprov,(S.deudaProv.get(r.cprov)||0)+r.pendiente);
-  if(is('subprog','subplan')) S.perfiles = await q(sb.from('perfiles').select('*').order('creado_at'));
+  if(is('subplan')) S.perfiles = await q(sb.from('perfiles').select('*').order('creado_at'));
 }
 async function refresh(){ try{ await Promise.all([loadFeed(), loadInternal()]); render(); } catch(e){ fail(e); } }
 const progTotal = id => sum(S.itemsByProg.get(id)||[], i=>i.monto);
@@ -496,7 +498,7 @@ function viewLogin(msg){
       <div></div>
     </section>
     <section class="login-form"><form class="login-card" id="lf">
-      <h2>Ingresar</h2><p>Usá el correo y la contraseña que te dieron los subsecretarios.</p>
+      <h2>Ingresar</h2><p>Usá el correo y la contraseña que te dio la Subsecretaría de Planificación Presupuestaria.</p>
       <label class="f">Correo<input type="email" id="lm" required autocomplete="username"></label>
       <label class="f">Contraseña<input type="password" id="lp" required autocomplete="current-password"></label>
       <div id="lmsg" class="note bad" ${msg?'':'hidden'}>${esc(msg||'')}</div>
@@ -506,7 +508,7 @@ function viewLogin(msg){
     ev.preventDefault(); const b=$('#lb'); b.disabled=true; b.textContent='Ingresando…';
     const {error} = await sb.auth.signInWithPassword({email:$('#lm').value.trim(), password:$('#lp').value});
     if(error){ b.disabled=false; b.textContent='Ingresar'; const m=$('#lmsg'); m.hidden=false;
-      m.textContent = /invalid/i.test(error.message)?'El correo o la contraseña no coinciden.': /banned/i.test(error.message)?'Esta cuenta está desactivada. Consultá con los subsecretarios.':error.message; }
+      m.textContent = /invalid/i.test(error.message)?'El correo o la contraseña no coinciden.': /banned/i.test(error.message)?'Esta cuenta está desactivada. Consultá con la Subsecretaría de Planificación Presupuestaria.':error.message; }
   };
 }
 function myAccount(){
@@ -514,7 +516,7 @@ function myAccount(){
   m.innerHTML=`<form class="dlg" id="maf"><h2>Mi cuenta</h2>
     <div class="row"><div class="av">${esc(initials(p.nombre||p.email))}</div><div><b>${esc(p.nombre||p.email)}</b><div class="cap">${esc(p.cargo||ROLES[realRole()])} · ${esc(p.email||'')}</div></div></div>
     <div class="card flat" style="padding:12px 14px"><label class="chk"><input type="checkbox" id="mavis" ${p.recibe_mails!==false?'checked':''}> Recibir los avisos por correo en ${esc(p.email||'')}</label>
-      <div class="cap">${realRole()==='director'?'Programaciones rechazadas, pagos aprobados y el resumen de alertas de los lunes a las 8.':realRole()==='subprog'?'Programaciones enviadas a aprobación y pagos aprobados.':'Pagos aprobados.'}</div></div>
+      <div class="cap">${realRole()==='director'?'Programaciones rechazadas, cambios que haga la Subsecretaría al aprobar, pagos aprobados y el resumen de alertas de los lunes a las 8.':realRole()==='subprog'?'Programaciones enviadas a aprobación y pagos aprobados.':'Pagos aprobados.'}</div></div>
     <label class="f">Contraseña nueva<input type="password" id="np1" minlength="8" required autocomplete="new-password"></label>
     <label class="f">Repetila<input type="password" id="np2" minlength="8" required autocomplete="new-password"></label>
     <div class="row"><button class="btn pri" type="submit">Cambiar contraseña</button><span class="sp"></span><button class="btn" type="button" id="mac">Cerrar</button></div></form>`;
@@ -571,7 +573,7 @@ function render(){
   if(!S.session){ viewLogin(); return; }
   if(!TABS.find(t=>t.id===S.tab&&t.ok())) S.tab='inicio';
   destroyCharts(); shell();
-  ({inicio:viewInicio, presel:viewPresel, revision:viewRevision, cheques:viewCheques, base:viewBase, analisis:viewAnalisis, alertas:viewAlertas, usuarios:viewUsuarios, proveedores:viewProveedores})[S.tab]();
+  ({inicio:viewInicio, presel:viewPresel, revision:viewRevision, cheques:viewCheques, base:viewBase, analisis:viewAnalisis, alertas:viewAlertas, techos:viewTechos, usuarios:viewUsuarios, proveedores:viewProveedores})[S.tab]();
 }
 let PV_NEXT=null;
 function goProveedor(cp){ if(S.tab==='proveedores'){ PV=cp; render(); window.scrollTo(0,0); } else { PV_NEXT=cp; location.hash='proveedores'; } }
@@ -799,7 +801,7 @@ function wbSummary(){
     <div class="card" style="display:flex;flex-direction:column;gap:9px">
       ${ed && W.dirty?'<div class="note warn">Hay cambios sin guardar.</div>':''}
       ${conf==='rechazar'?`<label class="f">Motivo del rechazo<textarea id="wobs" placeholder="Qué tiene que corregir el Director"></textarea></label><div class="row"><button class="btn bad" id="wRechOk">Confirmar rechazo</button><button class="btn" id="wCancel">Cancelar</button></div>`:''}
-      ${conf==='aprobar'?`<div class="note">Vas a aprobar <b>${its.length}</b> facturas por <b>${money(tot)}</b>. Queda publicada y se avisa por correo a todos los usuarios.</div><label class="f">Observación (opcional)<textarea id="wobs"></textarea></label><div class="row"><button class="btn ok" id="wAprOk">Aprobar</button><button class="btn" id="wCancel">Cancelar</button></div>`:''}
+      ${conf==='aprobar'?`<div class="note">Vas a aprobar <b>${its.length}</b> facturas por <b>${money(tot)}</b>. Queda publicada y se avisa por correo a todos los usuarios. Si cambiaste facturas o montos, el Director recibe el detalle de los cambios.</div><label class="f">Observación (opcional)<textarea id="wobs"></textarea></label><div class="row"><button class="btn ok" id="wAprOk">Aprobar</button><button class="btn" id="wCancel">Cancelar</button></div>`:''}
       ${conf==='descartar'?`<div class="note bad">Se descarta la programación. Queda registrada pero libera las facturas.</div><div class="row"><button class="btn bad" id="wDescOk">Descartar</button><button class="btn" id="wCancel">Cancelar</button></div>`:''}
       ${!conf && ed && W.mode==='director'?`<button class="btn pri wide" id="wSend" ${!its.length?'disabled':''}>Enviar a aprobación</button><button class="btn wide" id="wSave" ${!its.length&&!W.id?'disabled':''}>Guardar borrador</button>${W.id?'<button class="btn ghost wide" id="wDesc">Descartar</button>':''}`:''}
       ${!conf && ed && W.mode==='subprog'?`<button class="btn ok wide" id="wApr" ${!its.length?'disabled':''}>Aprobar…</button><button class="btn wide" id="wSave" ${!W.dirty?'disabled':''}>Guardar cambios</button><button class="btn bad wide" id="wRech">Rechazar…</button>`:''}
@@ -1330,7 +1332,7 @@ function activeAlerts(){
   const d=new Date(), y=d.getFullYear(), m=d.getMonth(), out=[];
   const cv=cargaVencida(); if(cv) out.push({cls:'warn',st:'Listado General',html:`${cv.txt} <a href="#base">Cargar</a>`});
   for(const c of controlPorPago()) if(c.falta>0.5) out.push({cls:'bad',st:'Programado y no pagado',html:`El pago del ${fd(c.fecha_pago)} tenía ${money(c.monto)} aprobados y, según el Listado General del ${fd(c.listado)}, no se pagaron <b class="amt">${money(c.falta)}</b> (${c.nf} facturas de ${c.np} proveedores). <a href="#alertas">Ver detalle</a>`});
-  for(let w=wom(today());w<=4;w++){ const tc=techoDe(y,m,w); if(!tc) continue; const t=paidIn(null,y,m,w,['aprobada','borrador','enviada']); if(t>tc.monto+0.5) out.push({cls:'bad',st:'Techo superado',html:`La semana ${w} de ${MES[m]} tiene programados ${money(t)} y el techo es ${money(tc.monto)}.`}); }
+  for(let w=wom(today());w<=4;w++){ const tc=techoDe(y,m,w); if(!tc) continue; const t=paidIn(null,y,m,w,['aprobada','borrador','enviada']); if(t>tc.monto+0.5) out.push({cls:'bad',st:'Techo superado',html:`La semana ${w} de ${MES[m]} tiene programados ${money(t)} y el techo es ${money(tc.monto)}. <a href="#techos">Ver techos</a>`}); }
   for(const a of S.alertas){ if(!alertApplies(a,y,m)) continue; const e=evalAlert(a,y,m);
     if(a.tipo==='proveedor' && ['Pendiente esta semana','Próxima semana','Incumplida'].includes(e.st)) out.push({cls:e.cls==='bad'?'bad':'warn',st:e.st,html:`${alertText(a)}. Pagado ${money(e.pag)}${e.cur?`, en curso ${money(e.cur)}`:''}.${a.nota?' '+esc(a.nota):''}`});
     if(a.tipo==='tope_semanal' && e.ex.length) out.push({cls:'bad',st:'Tope superado',html:`${alertText(a)}. Semana ${e.ex.map(x=>x.w+': '+mm(x.t)).join(', ')}.`});
@@ -1366,7 +1368,7 @@ let TF=null;
 function techosCard(){
   const canT=is('subplan'), mk=(TF&&TF.mes)||monthKey(today()), [yy,mo]=mk.split('-').map(Number), y=yy, m=mo-1;
   const rows=[1,2,3,4].map(w=>{ const [a,b]=womRange(y,m,w), tc=techoDe(y,m,w), apr=paidIn(null,y,m,w,['aprobada']), cur=paidIn(null,y,m,w,['borrador','enviada']); return {w,a,b,tc,apr,cur,tot:apr+cur}; });
-  return `<section class="card"><div class="sect"><div><h3>Techos semanales de pagos</h3><p class="cap">Los fija la Subsecretaría de Planificación Presupuestaria.${canT?' Dejá vacía una semana para no ponerle techo.':' Una semana sin techo no tiene límite.'}</p></div>
+  return `<section class="card"><div class="sect"><div><h3>Techos del mes</h3><p class="cap">${canT?'Montos en millones de pesos. Dejá vacía una semana para no ponerle techo.':'Una semana sin techo no tiene límite.'}</p></div>
       <label class="f">Mes<input type="month" id="tfmes" value="${mk}"></label></div>
     <div class="tw" style="margin-top:12px"><table><thead><tr><th>Semana</th><th class="n">Techo${canT?' (millones)':''}</th><th class="n">Aprobado</th><th class="n">En curso</th><th class="n">Disponible</th><th style="min-width:140px">Uso</th></tr></thead><tbody>
     ${rows.map(r=>{ const over=r.tc&&r.tot>r.tc.monto+0.5, pct=r.tc?Math.min(100,Math.round(r.tot/r.tc.monto*100)):0;
@@ -1391,11 +1393,32 @@ function controlCard(){
       :`<div class="empty" style="margin-top:10px"><b>Todavía no hay pagos para controlar</b>Se controlan los pagos aprobados cuya fecha ya quedó reflejada en un Listado General cargado después.</div>`}
     ${pend.length?`<div class="note" style="margin-top:10px">${pend.length===1?'El pago aprobado del '+fd(pend[0].fecha_pago)+' se va':pend.length+' pagos aprobados ('+pend.map(p=>fd(p.fecha_pago)).join(', ')+') se van'} a controlar cuando se cargue el próximo Listado General.</div>`:''}</section>`;
 }
+function viewTechos(){
+  const canT=is('subplan'), k0=monthKey(today());
+  const hist=S.techos.slice().sort((a,b)=>a.mes===b.mes?a.semana-b.semana:(a.mes<b.mes?1:-1));
+  main().innerHTML=`
+    <p class="lead" style="margin:0">Montos máximos de pagos para cada semana del mes. ${canT?'Los fijás vos; una semana vacía queda sin techo.':'Los fija la Subsecretaría de Planificación Presupuestaria.'} Se controlan contra todo lo programado en la semana y avisan en el inicio, en el editor de cada programación y en el correo de los lunes al Director.</p>
+    ${techosCard()}
+    ${hist.length?`<section class="card"><h3>Todos los techos cargados</h3><div class="tw" style="margin-top:10px"><table><thead><tr><th>Mes</th><th>Semana</th><th class="n">Techo</th><th class="n">Programado</th><th class="n">Diferencia</th><th></th></tr></thead><tbody>
+      ${hist.map(t=>{ const d=pd(t.mes), y=d.getFullYear(), m=d.getMonth(), [a,b]=womRange(y,m,t.semana), tot=paidIn(null,y,m,t.semana,['aprobada','borrador','enviada']), over=tot>t.monto+0.5, k=monthKey(t.mes);
+        return `<tr><td style="text-transform:capitalize">${monthName(k)}${k===k0?' <span class="pill info plain">actual</span>':''}</td><td class="nw">Semana ${t.semana} <span class="sub">del ${fd(iso(a))} al ${fd(iso(b))}</span></td><td class="n">${money(t.monto)}</td><td class="n">${money(tot)}</td><td class="n"><b style="color:${over?'var(--bad)':'var(--ink)'}">${over?'Superado por '+money(tot-t.monto):money(t.monto-tot)}</b></td><td><button class="link" data-tm="${k}">Ver mes</button></td></tr>`; }).join('')}</tbody></table></div></section>`:''}`;
+  const on=(id,fn)=>{ const b=$(id); if(b) b.onclick=fn; };
+  const tm=$('#tfmes'); if(tm) tm.onchange=()=>{ if(tm.value){ TF={mes:tm.value}; viewTechos(); } };
+  on('#tfSave',async()=>{ const mk=(TF&&TF.mes)||monthKey(today()), mes=mk+'-01', [yy,mo]=mk.split('-').map(Number);
+    try{
+      for(const inp of main().querySelectorAll('[data-tw]')){ const w=+inp.dataset.tw, raw=inp.value.trim(), ex=techoDe(yy,mo-1,w);
+        if(!raw){ if(ex) await q(sb.from('techos_semanales').delete().eq('mes',mes).eq('semana',w)); continue; }
+        const v=parseAmt(raw); if(!(v>0)) throw new Error(`El techo de la semana ${w} no es un número válido.`);
+        await q(sb.from('techos_semanales').upsert({mes, semana:w, monto:Math.round(v*1e6*100)/100}));
+      }
+      toast('Techos guardados'); await refresh();
+    }catch(e){ fail(e); } });
+  main().querySelectorAll('[data-tm]').forEach(b=>b.onclick=()=>{ TF={mes:b.dataset.tm}; viewTechos(); window.scrollTo(0,0); });
+}
 function viewAlertas(){
   const canEdit=is('subprog'), d=new Date(), y=d.getFullYear(), m=d.getMonth();
   main().innerHTML=`
-    <p class="lead" style="margin:0">Lo que se controla contra las programaciones: los techos semanales, si lo programado se pagó de verdad y las alertas de pagos comprometidos y facturas viejas. El Director de Pagos recibe este resumen por correo los lunes a las 8.</p>
-    ${techosCard()}
+    <p class="lead" style="margin:0">Lo que se controla contra las programaciones: si lo programado se pagó de verdad y las alertas de pagos comprometidos y facturas viejas. Los techos semanales están en su propia pestaña. El Director de Pagos recibe este resumen por correo los lunes a las 8.</p>
     ${controlCard()}
     <div class="sect" style="margin-top:6px"><div><h2>Alertas</h2><p class="cap">Las crea la Subsecretaría de Administración Financiera. Semanas del mes: 1 del 1 al 7 · 2 del 8 al 14 · 3 del 15 al 21 · 4 del 22 a fin de mes. Hoy es la semana ${wom(today())} de ${MES[m]}.</p></div>
       ${canEdit?'<button class="btn pri" id="alNew">+ Nueva alerta</button>':''}</div>
@@ -1409,16 +1432,6 @@ function viewAlertas(){
       :`<div class="empty"><b>No hay alertas cargadas</b>${canEdit?'Creá una para recordar un pago comprometido con un proveedor, o vigilar facturas viejas.':'La Subsecretaría de Administración Financiera define las alertas.'}</div>`}`;
   const on=(id,fn)=>{ const b=$(id); if(b) b.onclick=fn; };
   on('#alNew',()=>{ ALF={tipo:'proveedor'}; viewAlertas(); });
-  const tm=$('#tfmes'); if(tm) tm.onchange=()=>{ if(tm.value){ TF={mes:tm.value}; viewAlertas(); } };
-  on('#tfSave',async()=>{ const mk=(TF&&TF.mes)||monthKey(today()), mes=mk+'-01', [yy,mo]=mk.split('-').map(Number);
-    try{
-      for(const inp of main().querySelectorAll('[data-tw]')){ const w=+inp.dataset.tw, raw=inp.value.trim(), ex=techoDe(yy,mo-1,w);
-        if(!raw){ if(ex) await q(sb.from('techos_semanales').delete().eq('mes',mes).eq('semana',w)); continue; }
-        const v=parseAmt(raw); if(!(v>0)) throw new Error(`El techo de la semana ${w} no es un número válido.`);
-        await q(sb.from('techos_semanales').upsert({mes, semana:w, monto:Math.round(v*1e6*100)/100}));
-      }
-      toast('Techos guardados'); await refresh();
-    }catch(e){ fail(e); } });
   on('#ctXls',()=>xlsxSave('control-de-lo-programado.xlsx',[{name:'Control',head:['Fecha de pago','Programación','Proveedor','C.PROV','Comprobante','Programado','Saldo antes','Saldo después','Pagado','Resultado','Cómo se comparó','Listado del'],
     rows:S.control.map(c=>[fd(c.fecha_pago),c.titulo||'',c.proveedor,c.cprov,c.comprobante||c.clave,c.monto,c.saldo_antes,c.saldo_despues,c.pagado,c.resultado,c.comparacion,fd(c.listado)]),money:[5,6,7,8],ints:[3],widths:[12,22,38,9,20,16,16,16,16,12,26,12]}]).catch(fail));
   main().querySelectorAll('[data-cp]').forEach(b=>b.onclick=e=>{ e.preventDefault(); goProveedor(+b.dataset.cp); });
@@ -1457,10 +1470,10 @@ function viewUsuarios(){
   const ps=S.perfiles, me=S.session.user.id;
   const roles=['director','subprog','subplan','lector'];
   main().innerHTML=`
-    <div class="sect"><p class="lead" style="margin:0">Las cuentas no se pueden crear desde afuera: las dan de alta las dos subsecretarías, con el cargo y el rol asignados. Cada persona puede cambiar después su contraseña desde “Mi cuenta”.</p>
+    <div class="sect"><p class="lead" style="margin:0">Las cuentas no se pueden crear desde afuera: las da de alta solo la Subsecretaría de Planificación Presupuestaria, con el cargo y el rol asignados. Cada persona puede cambiar después su contraseña desde “Mi cuenta”.</p>
       <button class="btn pri" id="uNew">+ Nueva cuenta</button></div>
     ${UF?userForm():''}
-    <div class="note">Director de Pagos: preselecciona, envía, carga cheques y la base · Subs. Administración Financiera: aprueba, rechaza o modifica, crea alertas, carga la base y administra cuentas · Subs. Planificación Presupuestaria: ve todo, fija los techos semanales y administra cuentas, pero no aprueba ni rechaza · Lector: solo pagos aprobados. El correo de cada cuenta es donde le llegan los avisos.</div>
+    <div class="note">Director de Pagos: preselecciona, envía, carga cheques y la base · Subs. Administración Financiera: aprueba, rechaza o modifica, crea alertas y carga la base · Subs. Planificación Presupuestaria: ve todo, fija los techos semanales y administra cuentas, pero no aprueba ni rechaza · Lector: solo pagos aprobados. El correo de cada cuenta es donde le llegan los avisos.</div>
     <section class="card" style="padding:14px 10px"><div class="mov">${ps.map(p=>`<div class="mi" style="cursor:default;${p.activo===false?'opacity:.55':''}"><span class="av">${esc(initials(p.nombre||p.email))}</span>
       <span style="min-width:0"><span class="t" style="display:block">${esc(p.nombre||'—')}${p.id===me?' <span class="pill info plain">vos</span>':''}</span><span class="d" style="display:block">${esc(p.cargo||'Sin cargo')} · ${esc(p.email)}${p.recibe_mails===false?' · sin avisos por correo':''}</span></span>
       <span class="r" style="display:flex;flex-direction:column;align-items:flex-end;gap:6px"><span class="pill ${p.activo===false?'mute':p.rol==='lector'?'mute':'info'}">${p.activo===false?'Desactivada':ROLE_SHORT[p.rol]}</span>
