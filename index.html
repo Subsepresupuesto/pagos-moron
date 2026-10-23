@@ -184,6 +184,9 @@ input.money{text-align:right;width:150px;font-variant-numeric:tabular-nums}
 .seg button[aria-pressed="true"]{background:var(--card);color:var(--ink);box-shadow:var(--shadow)}
 .filters{display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end}
 .filters input[type=search]{width:260px}
+.ctlbar{align-items:flex-end}
+.ctlbar input,.ctlbar .btn{height:42px;box-sizing:border-box}
+.ctlbar input{padding-top:0;padding-bottom:0}
 
 /* tablas */
 .tw{overflow:auto;max-width:100%;border:1px solid var(--line);border-radius:12px}
@@ -1372,7 +1375,7 @@ function techosCard(){
   const canT=is('subplan'), mk=(TF&&TF.mes)||monthKey(today()), [yy,mo]=mk.split('-').map(Number), y=yy, m=mo-1;
   const rows=[1,2,3,4].map(w=>{ const [a,b]=womRange(y,m,w), tc=techoDe(y,m,w), apr=paidIn(null,y,m,w,['aprobada']), cur=paidIn(null,y,m,w,['borrador','enviada']); return {w,a,b,tc,apr,cur,tot:apr+cur}; });
   return `<section class="card"><div class="sect"><div><h3>Techos del mes</h3><p class="cap">${canT?'Montos en millones de pesos. Dejá vacía una semana para no ponerle techo.':'Una semana sin techo no tiene límite.'}</p></div>
-      <label class="f">Mes<input type="month" id="tfmes" value="${mk}"></label></div>
+      <div class="row ctlbar"><label class="f">Mes<input type="month" id="tfmes" value="${mk}"></label></div></div>
     <div class="tw" style="margin-top:12px"><table><thead><tr><th>Semana</th><th class="n">Techo${canT?' (millones)':''}</th><th class="n">Aprobado</th><th class="n">En curso</th><th class="n">Disponible</th><th style="min-width:140px">Uso</th></tr></thead><tbody>
     ${rows.map(r=>{ const over=r.tc&&r.tot>r.tc.monto+0.5, pct=r.tc?Math.min(100,Math.round(r.tot/r.tc.monto*100)):0;
       return `<tr><td class="nw"><b>Semana ${r.w}</b><span class="sub">del ${fd(iso(r.a))} al ${fd(iso(r.b))}</span></td>
@@ -1448,7 +1451,7 @@ function viewEsquemas(){
   main().innerHTML=`
     <p class="lead" style="margin:0">Cuánto hay que pagarle a cada proveedor y en qué semana del mes. Los cargan las Subsecretarías de Planificación Presupuestaria y de Administración Financiera; cuando carga Planificación, se avisa por correo a Administración Financiera. Se controlan contra las programaciones aprobadas y llegan al Director en el correo de los lunes.</p>
     <section class="card"><div class="sect"><div><h3>Esquemas de pago por proveedor</h3><p class="cap">Semanas del mes: 1 del 1 al 7 · 2 del 8 al 14 · 3 del 15 al 21 · 4 del 22 a fin de mes.${mk===monthKey(today())?` Hoy es la semana ${wom(today())}.`:''}</p></div>
-      <div class="row"><label class="f">Mes<input type="month" id="emes" value="${mk}"></label>
+      <div class="row ctlbar"><label class="f">Mes<input type="month" id="emes" value="${mk}"></label>
       ${canEdit?`${prev.length?`<button class="btn" id="eCopy" title="Copia los esquemas de ${monthName(prevK)} que no estén cargados en este mes">Copiar de ${MESC[(m+11)%12]}</button>`:''}<button class="btn pri" id="eNew">+ Nuevo esquema</button>`:''}</div></div>
     ${EF?esqForm(mk):''}
     ${gs.length?`<div class="tw" style="margin-top:12px"><table><thead><tr><th>Proveedor</th>${[1,2,3,4].map(w=>`<th class="n">Semana ${w}</th>`).join('')}<th class="n">Total</th>${canEdit?'<th></th>':''}</tr></thead><tbody>
