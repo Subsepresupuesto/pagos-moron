@@ -1,0 +1,19 @@
+# Latido diario: el plan gratuito de Supabase pausa el proyecto tras 7 días sin actividad.
+# Todos los días llama a la función public.latido() de la base. Si falla, GitHub avisa por correo.
+name: Latido Supabase
+on:
+  schedule:
+    - cron: '17 9 * * *'   # 6:17 de Buenos Aires
+  workflow_dispatch:
+jobs:
+  latido:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Llamar a la base
+        run: |
+          code=$(curl -s -o respuesta.txt -w '%{http_code}' -X POST \
+            'https://mkbtajgrxynqwrsebvhd.supabase.co/rest/v1/rpc/latido' \
+            -H 'apikey: sb_publishable_20WkAUCXyxZnaVZAGRp6ig_bmcOxe9t' \
+            -H 'Content-Type: application/json' -d '{}')
+          cat respuesta.txt; echo; echo "HTTP $code"
+          test "$code" -lt 300
