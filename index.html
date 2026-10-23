@@ -327,7 +327,29 @@ const CFG = {
   key: 'sb_publishable_20WkAUCXyxZnaVZAGRp6ig_bmcOxe9t',
   xlsxLib: 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js'
 };
-const sb = (window.__mockSupabase || window.supabase).createClient(CFG.url, CFG.key);
+/* La sesión vive solo en esta pestaña (sessionStorage): al cerrarla hay que volver a entrar.
+   Se borran además las sesiones persistentes que hayan quedado de versiones anteriores. */
+try{ Object.keys(localStorage).filter(k=>/^sb-.*-auth-token/.test(k)).forEach(k=>localStorage.removeItem(k)); }catch(e){}
+const sb = (window.__mockSupabase || window.supabase).createClient(CFG.url, CFG.key, { auth:{ storage: window.sessionStorage, persistSession:true, autoRefreshToken:true } });
+/* Cierre por inactividad */
+const INACT = { limite: 30*60*1000, aviso: 2*60*1000, timer:null, avisando:false };
+function marcarActividad(){ try{ sessionStorage.setItem('ultimaActividad', String(Date.now())); }catch(e){} if(INACT.avisando) cerrarAvisoInactividad(); }
+function ultimaActividad(){ try{ return +sessionStorage.getItem('ultimaActividad')||0; }catch(e){ return 0; } }
+function cerrarAvisoInactividad(){ INACT.avisando=false; const m=$('#modal'); if(m && m.dataset.inact){ m.hidden=true; m.innerHTML=''; delete m.dataset.inact; } }
+async function cerrarPorInactividad(){ cerrarAvisoInactividad(); try{ sessionStorage.removeItem('ultimaActividad'); }catch(e){} S.cierreMsg='La sesión se cerró por inactividad. Volvé a ingresar.'; await sb.auth.signOut(); }
+function vigilarInactividad(){
+  clearInterval(INACT.timer); if(!S.session) return;
+  if(!ultimaActividad()) marcarActividad();
+  INACT.timer=setInterval(()=>{
+    if(!S.session){ clearInterval(INACT.timer); return; }
+    const resto=INACT.limite-(Date.now()-ultimaActividad());
+    if(resto<=0){ clearInterval(INACT.timer); cerrarPorInactividad(); return; }
+    if(resto<=INACT.aviso && !INACT.avisando){ INACT.avisando=true; const m=$('#modal'); m.hidden=false; m.dataset.inact='1';
+      m.innerHTML=`<div class="dlg"><h2>¿Seguís ahí?</h2><p>Por seguridad, la sesión se cierra en dos minutos si no hay actividad.</p><div class="row"><button class="btn pri" id="inSeguir">Seguir conectado</button><button class="btn" id="inSalir">Salir</button></div></div>`;
+      $('#inSeguir').onclick=()=>marcarActividad(); $('#inSalir').onclick=()=>cerrarPorInactividad(); }
+  }, 15000);
+}
+['click','keydown','scroll','touchstart','mousemove'].forEach(ev=>window.addEventListener(ev,()=>{ if(!S.session) return; const u=ultimaActividad(); if(Date.now()-u>5000 && !INACT.avisando) marcarActividad(); },{passive:true}));
 
 /* ============ Íconos ============ */
 const IC = {
@@ -502,7 +524,7 @@ function viewLogin(msg){
       <div></div>
     </section>
     <section class="login-form"><form class="login-card" id="lf">
-      <h2>Ingresar</h2><p>Usá el correo y la contraseña que te dio la Subsecretaría de Planificación Presupuestaria.</p>
+      <h2>Ingresar</h2>
       <label class="f">Correo<input type="email" id="lm" required autocomplete="username"></label>
       <label class="f">Contraseña<input type="password" id="lp" required autocomplete="current-password"></label>
       <div id="lmsg" class="note bad" ${msg?'':'hidden'}>${esc(msg||'')}</div>
@@ -1743,13 +1765,14 @@ function viewProveedor(cprov){
   S.tab = location.hash.slice(1) || 'inicio';
   const { data:{ session } } = await sb.auth.getSession();
   S.session=session;
-  if(session){ await loadPerfil(); await refresh(); } else viewLogin();
+  if(session && ultimaActividad() && Date.now()-ultimaActividad()>INACT.limite){ S.cierreMsg='La sesión se cerró por inactividad. Volvé a ingresar.'; await sb.auth.signOut(); S.session=null; }
+  if(S.session){ marcarActividad(); vigilarInactividad(); await loadPerfil(); await refresh(); } else { viewLogin(S.cierreMsg); S.cierreMsg=null; }
   sb.auth.onAuthStateChange(async (ev, session)=>{
     if(ev==='SIGNED_IN'||ev==='SIGNED_OUT'){
       if((session?.user?.id||null)===(S.session?.user?.id||null)) return;
       S.session=session; W=null; S.feedItems.clear();
-      if(!session){ viewLogin(); return; }
-      await loadPerfil(); await refresh();
+      if(!session){ clearInterval(INACT.timer); viewLogin(S.cierreMsg); S.cierreMsg=null; return; }
+      marcarActividad(); vigilarInactividad(); await loadPerfil(); await refresh();
     }
   });
 })().catch(e=>{ $('#root').innerHTML=`<div class="empty" style="margin:40px auto;max-width:520px"><b>No se pudo conectar con la base de datos</b>${esc(e.message||e)}. Revisá la conexión y recargá la página.</div>`; });
