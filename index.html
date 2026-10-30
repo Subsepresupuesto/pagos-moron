@@ -755,7 +755,7 @@ function viewWB(){
       <div class="row" style="margin-top:6px"><h2 style="font-size:22px">${W.id?esc(W.titulo||'Programación'):'Nueva programación'}</h2><span class="st ${W.estado}">${ESTADOS[W.estado]}</span></div>
       <p class="lead">${W.mode==='subprog'?'Revisá la preselección del Director de Pagos. Podés tildar o destildar facturas y cambiar montos antes de aprobar.':W.mode==='ver'?'Consulta de una programación.':'Filtrá la base, tildá facturas de a una o todas las filtradas. Podés ajustar el monto para pagos parciales.'}</p></div></div>
     ${W.estado==='rechazada'&&W.obs?`<div class="note bad"><b>Devuelta por la Subsecretaría:</b> ${esc(W.obs)}</div>`:''}
-    ${W.imp?`<div class="note ${W.imp.notFound.length?'warn':'ok'}"><b>Planilla ${esc(W.imp.file)}:</b> ${W.imp.ok} facturas tildadas${W.imp.ajust?`, ${W.imp.ajust} con el monto ajustado al saldo disponible`:''}${W.imp.sinSaldo?`, ${W.imp.sinSaldo} sin saldo disponible`:''}.${W.imp.notFound.length?` ${W.imp.notFound.length} no están en la base: ${esc(W.imp.notFound.slice(0,8).join(', '))}${W.imp.notFound.length>8?'…':''}.`:''} Revisá y guardá.</div>`:''}
+    ${W.imp?`<div class="note ${W.imp.notFound.length?'warn':'ok'}"><b>Planilla ${esc(W.imp.file)}:</b> ${W.imp.ok} facturas tildadas de la base${W.imp.fuera?`, ${W.imp.fuera} agregadas fuera de la base con los datos de la planilla`:''}${W.imp.ajust?`, ${W.imp.ajust} con el monto ajustado al saldo disponible`:''}${W.imp.sinSaldo?`, ${W.imp.sinSaldo} sin saldo disponible`:''}.${W.imp.notFound.length?` ${W.imp.notFound.length} sin monto para pagar, no se cargaron: ${esc(W.imp.notFound.slice(0,8).join(', '))}${W.imp.notFound.length>8?'…':''}.`:''} Revisá y guardá.</div>`:''}
     ${!S.carga?`<div class="note warn">No hay base de facturas cargada. Cargala desde <a href="#base">Base de facturas</a>.</div>`:''}
     <div class="wb">
       <div style="display:flex;flex-direction:column;gap:14px;min-width:0">
@@ -806,8 +806,18 @@ function wbOutside(){
   const out=[...W.items.values()].filter(i=>!S.factByKey.has(i.clave));
   const quit=W.mode==='subprog'?[...W.pres.values()].filter(x=>!W.items.has(x.clave)):[];
   let h='';
-  if(out.length) h+=`<div class="card"><h3>Fuera de la base actual (${out.length})</h3><p class="cap">Están en la programación pero no figuran en la última base cargada.</p>
-    <div class="tw" style="margin-top:10px"><table><tbody>${out.map(i=>`<tr><td class="prov">${esc(i.proveedor)}</td><td>${esc(i.comprobante)}</td><td class="n">${money(i.monto)}</td><td>${editable()?`<button class="btn sm" data-rm="${esc(i.clave)}">Quitar</button>`:''}</td></tr>`).join('')}</tbody></table></div></div>`;
+  const ed=editable();
+  if(out.length||ed) h+=`<div class="card"><div class="sect"><div><h3>Fuera de la base (${out.length})</h3><p class="cap">Facturas que se pagan aunque no figuren en el último Listado General cargado.</p></div>${ed?'<button class="btn sm" id="fbNew">+ Agregar factura</button>':''}</div>
+    ${ed&&W.fb?`<form id="fbf" class="filters" style="margin-top:12px">${provOptions()}
+      <label class="f" style="flex:2 1 240px">Proveedor<input type="text" id="fbp" list="provs" required placeholder="Nombre o elegí de la lista"></label>
+      <label class="f">C.PROV<input type="number" id="fbc" style="width:100px" placeholder="opcional"></label>
+      <label class="f">Comprobante<input type="text" id="fbn" required style="width:160px" placeholder="0001-00000001"></label>
+      <label class="f">F. factura<input type="date" id="fbd"></label>
+      <label class="f">FF<select id="fbff">${FFS.map(x=>`<option>${x}</option>`).join('')}</select></label>
+      <label class="f">Dependencia<input type="text" id="fbdep" style="width:200px"></label>
+      <label class="f">A pagar ($)<input type="text" id="fbm" class="money" required></label>
+      <button class="btn pri" type="submit">Agregar</button><button class="btn" type="button" id="fbx">Cancelar</button></form>`:''}
+    ${out.length?`<div class="tw" style="margin-top:10px"><table><tbody>${out.map(i=>`<tr><td class="prov"><b>${esc(i.proveedor)}</b><span class="sub">${i.cprov?'C.PROV '+i.cprov:'Sin C.PROV'}${i.dependencia?' · '+esc(i.dependencia):''}</span></td><td class="nw">${esc(i.comprobante)}<span class="sub">${i.f_factura?fd(i.f_factura):''}${i.ff?' · FF '+i.ff:''}</span></td><td class="n">${ed?`<input type="text" class="money" data-om="${esc(i.clave)}" value="${nf2.format(i.monto)}">`:money(i.monto)}</td><td>${ed?`<button class="btn sm" data-rm="${esc(i.clave)}">Quitar</button>`:''}</td></tr>`).join('')}</tbody></table></div>`:''}</div>`;
   if(quit.length) h+=`<div class="card"><h3>Quitadas de la preselección (${quit.length})</h3><p class="cap">El Director las había incluido. Si las restaurás vuelven con el monto original.</p>
     <div class="tw" style="margin-top:10px"><table><tbody>${quit.map(x=>`<tr><td class="prov">${esc(x.proveedor)}</td><td>${esc(x.comprobante)}</td><td class="n">${money(x.monto)}</td><td>${editable()?`<button class="btn sm" data-restore="${esc(x.clave)}">Restaurar</button>`:''}</td></tr>`).join('')}</tbody></table></div></div>`;
   return h;
@@ -863,6 +873,17 @@ function bindWB(){
     const mk=e.target.dataset.m; if(mk){ const v=parseAmt(e.target.value); const it=W.items.get(mk); if(!it) return; if(!(v>0)){ toast('El monto tiene que ser mayor a cero.',true); setTimeout(r,0); return; } it.monto=Math.round(v*100)/100; W.dirty=true; setTimeout(r,0); }
   });
   document.querySelectorAll('[data-rm]').forEach(b=>b.onclick=()=>{ W.items.delete(b.dataset.rm); W.dirty=true; r(); });
+  document.querySelectorAll('[data-om]').forEach(inp=>inp.onchange=()=>{ const it=W.items.get(inp.dataset.om); const v=parseAmt(inp.value); if(!it) return; if(!(v>0)){ toast('El monto tiene que ser mayor a cero.',true); setTimeout(r,0); return; } it.monto=Math.round(v*100)/100; W.dirty=true; setTimeout(r,0); });
+  const fbn=$('#fbNew'); if(fbn) fbn.onclick=()=>{ W.fb=true; r(); };
+  const fbx=$('#fbx'); if(fbx) fbx.onclick=()=>{ W.fb=false; r(); };
+  const fbf=$('#fbf'); if(fbf) fbf.onsubmit=ev=>{ ev.preventDefault();
+    const pv=parseProv($('#fbp').value), cp=pv.cprov||(+$('#fbc').value||null), comp=$('#fbn').value.trim(), m=parseAmt($('#fbm').value);
+    if(!pv.proveedor||!comp){ toast('Falta el proveedor o el comprobante.',true); return; }
+    if(!(m>0)){ toast('El monto a pagar tiene que ser mayor a cero.',true); return; }
+    const k=(cp||'S/C')+'|'+comp;
+    if(S.factByKey.has(k)){ toast('Esa factura está en la base: tildala desde la lista.',true); return; }
+    W.items.set(k,{clave:k,cprov:cp,proveedor:pv.proveedor.toUpperCase(),dependencia:$('#fbdep').value.trim(),ff:+$('#fbff').value,oc:null,expediente:null,comprobante:comp,f_factura:$('#fbd').value||null,importe:m,monto:Math.round(m*100)/100,nota:'',fuera:true});
+    W.fb=false; W.dirty=true; r(); };
   document.querySelectorAll('[data-restore]').forEach(b=>b.onclick=()=>{ const x=W.pres.get(b.dataset.restore); const base=S.factByKey.get(x.clave); W.items.set(x.clave, base?itemFrom(base,+x.monto):{...x,monto:+x.monto}); W.dirty=true; r(); });
   const wf=$('#wfecha'); if(wf) wf.onchange=e=>{ W.fecha=e.target.value||W.fecha; W.dirty=true; setTimeout(r,0); };
   const wt=$('#wtit'); if(wt) wt.oninput=e=>{ W.titulo=e.target.value; W.dirty=true; };
@@ -1166,16 +1187,17 @@ async function importAPagar(file){
     toast('Leyendo '+file.name+'…');
     const L=await readListado(file,['cprov','comprobante']);
     const prev=W; openWB(null,'director');
-    const notFound=[]; let ok=0, ajust=0, sinSaldo=0;
+    const notFound=[]; let ok=0, ajust=0, sinSaldo=0, fuera=0;
     for(const r of L.rows){
       const b=S.factByKey.get(r.cprov+'|'+r.comprobante);
-      if(!b){ notFound.push(r.comprobante); continue; }
+      if(!b){ const m=r.apagar>0?r.apagar:(r.saldo>0?r.saldo:r.importe); if(!(m>0)){ notFound.push(r.comprobante); continue; }
+        const k=r.cprov+'|'+r.comprobante; W.items.set(k,{clave:k,cprov:r.cprov,proveedor:r.proveedor,dependencia:r.dependencia,ff:r.ff,oc:r.oc,expediente:r.expediente,comprobante:r.comprobante,f_factura:r.f_factura,importe:r.importe||m,monto:Math.round(m*100)/100,nota:'',fuera:true}); fuera++; continue; }
       const disp=disponible(b); if(disp<=0){ sinSaldo++; continue; }
       let m=r.apagar>0?r.apagar:disp; if(m>disp+0.5){ m=disp; ajust++; }
       W.items.set(b.clave,itemFrom(b,m)); ok++;
     }
     notFound.push(...L.badFF.map(c=>c+' (FF inválida)'));
-    W.imp={file:file.name, ok, ajust, sinSaldo, notFound}; W.dirty=true; W.f.selOnly=true;
+    W.imp={file:file.name, ok, ajust, sinSaldo, notFound, fuera}; W.dirty=true; W.f.selOnly=true;
     viewWB();
   }catch(e){ fail(e); }
 }
