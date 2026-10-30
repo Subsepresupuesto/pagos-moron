@@ -1,19 +1,31 @@
-# Latido diario: el plan gratuito de Supabase pausa el proyecto tras 7 días sin actividad.
-# Todos los días llama a la función public.latido() de la base. Si falla, GitHub avisa por correo.
+# Latido de Supabase: el plan gratuito pausa el proyecto tras 7 días sin actividad.
+# Dos veces por día escribe en la base (public.latido) y consulta el servicio de usuarios.
+# Si algo falla (por ejemplo, el proyecto quedó pausado), la corrida sale en rojo y GitHub avisa por correo.
 name: Latido Supabase
 on:
   schedule:
-    - cron: '17 9 * * *'   # 6:17 de Buenos Aires
+    - cron: '17 9 * * *'    # 6:17 de Buenos Aires
+    - cron: '17 21 * * *'   # 18:17 de Buenos Aires
   workflow_dispatch:
 jobs:
   latido:
     runs-on: ubuntu-latest
+    env:
+      URL: https://mkbtajgrxynqwrsebvhd.supabase.co
+      KEY: sb_publishable_20WkAUCXyxZnaVZAGRp6ig_bmcOxe9t
     steps:
-      - name: Llamar a la base
+      - name: Escribir el latido en la base
         run: |
-          code=$(curl -s -o respuesta.txt -w '%{http_code}' -X POST \
-            'https://mkbtajgrxynqwrsebvhd.supabase.co/rest/v1/rpc/latido' \
-            -H 'apikey: sb_publishable_20WkAUCXyxZnaVZAGRp6ig_bmcOxe9t' \
-            -H 'Content-Type: application/json' -d '{}')
-          cat respuesta.txt; echo; echo "HTTP $code"
+          for i in 1 2 3; do
+            code=$(curl -s -o respuesta.txt -w '%{http_code}' -X POST "$URL/rest/v1/rpc/latido" \
+              -H "apikey: $KEY" -H 'Content-Type: application/json' -d '{}')
+            echo "Intento $i: HTTP $code $(cat respuesta.txt)"
+            [ "$code" -lt 300 ] && exit 0
+            sleep 20
+          done
+          exit 1
+      - name: Consultar el servicio de usuarios
+        run: |
+          code=$(curl -s -o salud.txt -w '%{http_code}' "$URL/auth/v1/health" -H "apikey: $KEY")
+          echo "HTTP $code $(cat salud.txt)"
           test "$code" -lt 300
