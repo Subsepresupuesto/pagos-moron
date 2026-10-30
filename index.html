@@ -242,6 +242,7 @@ tfoot td{font-weight:800;background:var(--card2)!important;border-top:1px solid 
 .ticket label.f{color:rgba(255,255,255,.75)}
 .ticket input{background:rgba(255,255,255,.1);border-color:rgba(255,255,255,.18);color:#fff}
 .ticket input:disabled{opacity:.8}
+.ticket input{width:100%;box-sizing:border-box;color-scheme:dark}
 .toplist .it{display:flex;justify-content:space-between;gap:10px;font-size:13px;margin-top:8px}
 .toplist .it span:first-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 
@@ -827,9 +828,9 @@ function wbSummary(){
       ${W.mode==='subprog'&&W.pres.size?`<div class="ln"><span>Preselección del Director</span><span class="amt">${money(presTot)}</span></div><div class="ln"><span>Diferencia</span><span class="amt">${money(tot-presTot)}</span></div>`:''}
       <div class="ln"><span>Gasto ${new Date().getFullYear()}</span><span class="amt">${money(tot-tDeuda)}</span></div><div class="ln"><span>Deuda de años anteriores</span><span class="amt">${money(tDeuda)}</span></div>
       ${[...byFF.entries()].map(([k,v])=>`<div class="ln"><span>FF ${k}</span><span class="amt">${money(v)}</span></div>`).join('')}
-      <div class="row" style="margin-top:12px;align-items:flex-end">
-        <label class="f" style="flex:1">Fecha de pago<input type="date" id="wfecha" value="${W.fecha}" ${ed?'':'disabled'}></label>
-        <label class="f" style="flex:1">Título<input type="text" id="wtit" value="${esc(W.titulo)}" ${ed?'':'disabled'}></label></div>
+      <div style="display:grid;grid-template-columns:minmax(0,1fr);gap:10px;margin-top:12px">
+        <label class="f">Fecha de pago<input type="date" id="wfecha" value="${W.fecha}" ${ed?'':'disabled'}></label>
+        <label class="f">Título<input type="text" id="wtit" value="${esc(W.titulo)}" ${ed?'':'disabled'}></label></div>
     </div>
     ${top.length?`<div class="card toplist"><h3>Mayores proveedores</h3>${top.map(([n,v])=>`<div class="it"><span>${esc(n)}</span><span class="amt">${mm(v)}</span></div><div class="bar"><i style="width:${Math.round(v/top[0][1]*100)}%"></i></div>`).join('')}</div>`:''}
     ${al.length?`<div class="card"><h3>Alertas de esta semana</h3>${al.map(a=>`<div class="note ${a.cls}" style="margin-top:8px">${a.html}</div>`).join('')}</div>`:''}
